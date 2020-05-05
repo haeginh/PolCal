@@ -31,6 +31,7 @@
 #include "POLYModelImport.hh"
 #include "G4UIcommand.hh"
 #include "G4TriangularFacet.hh"
+#include "G4Timer.hh"
 #include <set>
 
 POLYModelImport::POLYModelImport(G4bool isAF, G4UIExecutive* ui, G4String _phantomName)
@@ -82,7 +83,10 @@ void POLYModelImport::DataRead(G4String objFileN)
 	G4double x, y, z;
 	std::vector<G4ThreeVector> pointVec;
 	std::vector<std::vector<G4int>> faceVec;
-	G4int a, b, c, id(0), shellCount(0);
+    std::map<G4int, std::vector<std::vector<std::vector<G4int>>>> shells;
+    G4int a, b, c, id(0), shellCount(0);
+    G4Timer* timer = new G4Timer;
+    G4double sepTime(0);
 	while (getline(ifs, dump)) {
 		std::stringstream ss(dump);
 		if(!(ss >> firstStr)) continue;
@@ -95,64 +99,64 @@ void POLYModelImport::DataRead(G4String objFileN)
 			faceVec.push_back({ a-1, b-1, c-1});
 		}
 		else if (firstStr == "g") {
-			if(!faceVec.empty()){
-				std::vector<std::vector<std::vector<G4int>>> sep;
-				if(id==10600) sep.push_back(faceVec);
-				else sep = SeparateShell(faceVec);
-				for(size_t i=0;i<sep.size();i++){
-					G4TessellatedSolid* tess = new G4TessellatedSolid
-							(G4UIcommand::ConvertToString(id)+"_"+G4UIcommand::ConvertToString(G4int(i)));
-					tessVec.push_back(std::make_pair(tess, id));
-					for(auto f:sep[i]){
-						tess->AddFacet(new G4TriangularFacet(pointVec[f[0]],pointVec[f[1]],pointVec[f[2]],ABSOLUTE));
-					}
-					tess->SetSolidClosed(true);
-				}
+            ss >> dump;
+            id = atoi(StringSplitterFirst(dump, "_").c_str());
+            G4cout<<"Reading..ID "<<id<<" -- "<<std::flush;
+            if(!faceVec.empty()){
+                timer->Start();
+                auto sep = SeparateShell(faceVec);
+                timer->Stop();
+                sepTime += timer->GetRealElapsed();
+                shells[id] = sep;
 				faceVec.clear();
-				G4cout<<sep.size()<<" Solids were made"<<G4endl;
+                G4cout<<shells[id].size()<<" subshells"<<G4endl;
 			}
-
-			ss >> dump;
-			id = atoi(StringSplitterFirst(dump, "_").c_str());
-			G4cout<<"Reading..ID "<<id<<" -- "<<std::flush;
 			shellCount++;
 		}
 	}
-	auto sep = SeparateShell(faceVec);
-	for(size_t i=0;i<sep.size();i++){
-		G4TessellatedSolid* tess = new G4TessellatedSolid
-				(G4UIcommand::ConvertToString(id)+"_"+G4UIcommand::ConvertToString(G4int(i)));
-		tessVec.push_back(std::make_pair(tess, id));
-		for(auto f:sep[i]){
-			tess->AddFacet(new G4TriangularFacet(pointVec[f[0]],pointVec[f[1]],pointVec[f[2]],ABSOLUTE));
-		}
-		tess->SetSolidClosed(true);
-	}
-	faceVec.clear();
-	G4cout<<sep.size()<<" Solids were made"<<G4endl;
+
+    boundingBox_Max = pointVec[0];
+    boundingBox_Min = pointVec[0];
+    for(auto p:pointVec){
+        if(p.getX()>boundingBox_Max.getX())
+            boundingBox_Max.setX(p.getX());
+        else if(p.getX()<boundingBox_Min.getX())
+            boundingBox_Min.setX(p.getX());
+
+        if(p.getY()>boundingBox_Max.getY())
+            boundingBox_Max.setY(p.getY());
+        else if(p.getY()<boundingBox_Min.getY())
+            boundingBox_Min.setY(p.getY());
+
+        if(p.getZ()>boundingBox_Max.getZ())
+            boundingBox_Max.setZ(p.getZ());
+        else if(p.getZ()<boundingBox_Min.getZ())
+            boundingBox_Min.setZ(p.getZ());
+    }
+    phantomSize = boundingBox_Max-boundingBox_Min;
+    G4ThreeVector center  = (boundingBox_Max + boundingBox_Min)*0.5;
+    G4cout<< "Phantom shift by "<<center/cm<<" cm"<<G4endl;
+    G4cout<<"************SEPATRAION TIME: "<<sepTime<<"************"<<G4endl;
+    boundingBox_Max -= center;
+    boundingBox_Min -= center;
+    for(auto &point:pointVec) point -= center;
+
+    for(auto shell:shells){
+        for(size_t i=0;i<shell.second.size();i++){
+            id = shell.first;
+            G4TessellatedSolid* tess = new G4TessellatedSolid
+                    (G4UIcommand::ConvertToString(id)+"_"+G4UIcommand::ConvertToString(G4int(i)));
+            tessVec.push_back(std::make_pair(tess, id));
+            for(auto f:shell.second[i]){
+                tess->AddFacet(new G4TriangularFacet(pointVec[f[0]],pointVec[f[1]],pointVec[f[2]],ABSOLUTE));
+            }
+            tess->SetSolidClosed(true);
+        }
+    }
+
 	G4cout<<"  => "<<tessVec.size()<<" tessellated solids were generated"<<std::flush;
 	ArrangeTess();
 	G4cout<<" and arranged"<<G4endl;
-
-	boundingBox_Max = pointVec[0];
-	boundingBox_Min = pointVec[0];
-	for(auto p:pointVec){
-		if(p.getX()>boundingBox_Max.getX())
-			boundingBox_Max.setX(p.getX());
-		else if(p.getX()<boundingBox_Min.getX())
-			boundingBox_Min.setX(p.getX());
-
-		if(p.getY()>boundingBox_Max.getY())
-			boundingBox_Max.setY(p.getY());
-		else if(p.getY()<boundingBox_Min.getY())
-			boundingBox_Min.setY(p.getY());
-
-		if(p.getZ()>boundingBox_Max.getZ())
-			boundingBox_Max.setZ(p.getZ());
-		else if(p.getZ()<boundingBox_Min.getZ())
-			boundingBox_Min.setZ(p.getZ());
-	}
-	phantomSize = boundingBox_Max-boundingBox_Min;
 }
 
 void POLYModelImport::ArrangeTess(){
