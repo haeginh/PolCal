@@ -1,0 +1,30 @@
+# Example macro file to run in the batch mode
+
+# Set the verbose
+/run/verbose 2
+
+# Set the number of threads for multi-threading mode
+/run/numberOfThreads  1
+
+# Initialize
+/run/initialize
+
+# Source setting
+/gps/pos/type Plane
+/gps/pos/shape Square
+/gps/pos/centre 0 -5 0 m
+/gps/pos/halfx 28.0194 cm
+/gps/pos/halfy 87.1382 cm
+/gps/pos/rot1 1 0 0
+/gps/pos/rot2 0 0 1
+/gps/direction 0 1 0
+/control/execute cases.in
+/control/execute cases.in
+/control/execute cases.in
+/control/execute cases.in
+/control/execute cases.in
+/control/execute cases.in
+/control/execute cases.in
+/control/execute cases.in
+/control/execute cases.in
+/control/execute cases.in

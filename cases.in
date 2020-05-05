@@ -1,0 +1,23 @@
+/gps/particle gamma
+/gps/energy 0.01 MeV
+/run/beamOn 100000
+/gps/energy 0.1 MeV
+/run/beamOn 100000
+/gps/energy 1 MeV
+/run/beamOn 100000
+/gps/energy 10 MeV
+/run/beamOn 100000
+/gps/energy 100 MeV
+/run/beamOn 100000
+
+/gps/particle e-
+/gps/energy 0.01 MeV
+/run/beamOn 100000
+/gps/energy 0.1 MeV
+/run/beamOn 100000
+/gps/energy 1 MeV
+/run/beamOn 100000
+/gps/energy 10 MeV
+/run/beamOn 100000
+/gps/energy 100 MeV
+/run/beamOn 100000
